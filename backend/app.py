@@ -2,8 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-
-# Load environment variables
+import difflib
 load_dotenv()
 
 # Initialize Flask app
@@ -27,6 +26,26 @@ detector = AIDetector()
 
 # Create upload folder
 os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
+
+def _generate_word_diff(original, humanized):
+    # Splits by word for diffing
+    orig_words = original.split()
+    hum_words = humanized.split()
+    matcher = difflib.SequenceMatcher(None, orig_words, hum_words)
+    diff_data = []
+    
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            diff_data.append({'type': 'equal', 'value': ' '.join(orig_words[i1:i2])})
+        elif tag == 'replace':
+            diff_data.append({'type': 'removed', 'value': ' '.join(orig_words[i1:i2])})
+            diff_data.append({'type': 'added', 'value': ' '.join(hum_words[j1:j2])})
+        elif tag == 'delete':
+            diff_data.append({'type': 'removed', 'value': ' '.join(orig_words[i1:i2])})
+        elif tag == 'insert':
+            diff_data.append({'type': 'added', 'value': ' '.join(hum_words[j1:j2])})
+            
+    return diff_data
 
 
 # ===== HUMANIZE ROUTE =====
@@ -56,12 +75,16 @@ def humanize():
         detection_before = {'ai_score': 0, 'patterns': []}
         detection_after = {'ai_score': 0, 'patterns': []}
 
+    # Generate Diff
+    diff_result = _generate_word_diff(text, humanized)
+
     return jsonify({
         'success': True,
         'original': text,
         'humanized': humanized,
-        'ai_score_before': detection_before['ai_score'],
-        'ai_score_after': detection_after['ai_score'],
+        'diff': diff_result,
+        'ai_score_before': detection_before.get('ai_score', 0),
+        'ai_score_after': detection_after.get('ai_score', 0),
         'patterns_removed': detection_before.get('patterns', []),
     })
 

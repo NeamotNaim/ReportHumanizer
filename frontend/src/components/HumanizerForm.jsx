@@ -1,9 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function HumanizerForm({ onHumanize, loading }) {
   const [text, setText] = useState('')
   const [tone, setTone] = useState('casual')
   const [language, setLanguage] = useState('en')
+  
+  const loadingStates = [
+    'Analyzing text structure...',
+    'Removing AI fingerprints...',
+    'Paraphrasing sentences...',
+    'Applying natural nuances...',
+    'Refining grammar and tone...'
+  ]
+  const [loadingStep, setLoadingStep] = useState(0)
+
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      interval = setInterval(() => {
+        setLoadingStep((prev) => (prev + 1 < loadingStates.length ? prev + 1 : prev))
+      }, 3000)
+    } else {
+      setLoadingStep(0)
+    }
+    return () => clearInterval(interval)
+  }, [loading])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -154,7 +175,7 @@ export default function HumanizerForm({ onHumanize, loading }) {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Processing...
+              {loadingStates[loadingStep]}
             </>
           ) : (
             <>
