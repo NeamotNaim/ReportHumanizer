@@ -1,4 +1,10 @@
-export default function Header() {
+export default function Header({ providerInfo }) {
+  const providerLabel = {
+    gemini: '✨ Gemini',
+    openai: '🤖 GPT-4o',
+    anthropic: '🧠 Claude',
+  }
+
   return (
     <header className="glass sticky top-0 z-50 border-b border-indigo-500/10">
       <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -10,10 +16,22 @@ export default function Header() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold gradient-text">AI Text Humanizer</h1>
-            <p className="text-xs text-slate-400">Transform AI text into natural writing</p>
+            <h1 className="text-xl font-bold gradient-text">Draft Revision Studio</h1>
+            <p className="text-xs text-slate-400">Multi-stage AI humanization pipeline</p>
           </div>
         </div>
+
+        {/* Provider status badge */}
+        {providerInfo && (
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${providerInfo.llm_available ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-red-400'}`} />
+            <span className="text-xs text-slate-400">
+              {providerInfo.llm_available
+                ? providerLabel[providerInfo.provider] || providerInfo.provider
+                : 'No LLM connected'}
+            </span>
+          </div>
+        )}
       </div>
     </header>
   )

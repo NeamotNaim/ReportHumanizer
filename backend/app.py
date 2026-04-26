@@ -61,13 +61,28 @@ def humanize():
     if not text or len(text) > 10000:
         return jsonify({'error': 'Text must be between 1 and 10000 characters'}), 400
 
-    # Humanize text
+    # Analyze text before humanization
     try:
-        humanized = humanizer.humanize(text, tone=tone, language=language)
+        analysis_before = humanizer.analyze_text(text, tone=tone)
+    except Exception as e:
+        analysis_before = {"issues": [], "strengths": []}
+
+    # Humanize text (now returns dict with humanized text + metadata)
+    try:
+        result = humanizer.humanize(text, tone=tone, language=language)
+        humanized = result["humanized"]
+        iterations = result.get("iterations", 0)
+        stage_log = result.get("stage_log", [])
     except Exception as e:
         return jsonify({'error': f'Humanization failed: {str(e)}'}), 500
 
-    # Detect AI patterns
+    # Analyze text after humanization
+    try:
+        analysis_after = humanizer.analyze_text(humanized, tone=tone)
+    except Exception as e:
+        analysis_after = {"issues": [], "strengths": []}
+
+    # Detect AI patterns before and after
     try:
         detection_before = detector.detect(text)
         detection_after = detector.detect(humanized)
@@ -78,6 +93,10 @@ def humanize():
     # Generate Diff
     diff_result = _generate_word_diff(text, humanized)
 
+    # Word count comparison
+    original_words = len(text.split())
+    humanized_words = len(humanized.split())
+
     return jsonify({
         'success': True,
         'original': text,
@@ -86,6 +105,31 @@ def humanize():
         'ai_score_before': detection_before.get('ai_score', 0),
         'ai_score_after': detection_after.get('ai_score', 0),
         'patterns_removed': detection_before.get('patterns', []),
+        'analysis_before': analysis_before,
+        'analysis_after': analysis_after,
+        'word_count_original': original_words,
+        'word_count_humanized': humanized_words,
+        'iterations': iterations,
+        'stage_log': stage_log,
+        'provider': os.getenv('LLM_PROVIDER', 'gemini'),
+        'assessment_note': (
+            'These scores are local heuristics for structure and phrasing. '
+            'They are not equivalent to Turnitin, GPTZero, or any external AI detector. '
+            'However, the multi-stage pipeline significantly improves humanization quality.'
+        ),
+    })
+
+
+# ===== PROVIDER INFO ROUTE =====
+
+@app.route('/api/provider', methods=['GET'])
+def get_provider_info():
+    """Return current LLM provider status."""
+    return jsonify({
+        'provider': os.getenv('LLM_PROVIDER', 'gemini'),
+        'model_loaded': humanizer.model_loaded,
+        'llm_available': humanizer.llm.is_available if humanizer.llm else False,
+        'model_name': humanizer.llm.model_name if humanizer.llm else None,
     })
 
 
@@ -131,7 +175,9 @@ def upload_file():
 def health_check():
     return jsonify({
         'status': 'healthy',
-        'model_loaded': humanizer.model_loaded if hasattr(humanizer, 'model_loaded') else True,
+        'model_loaded': humanizer.model_loaded,
+        'provider': os.getenv('LLM_PROVIDER', 'gemini'),
+        'llm_available': humanizer.llm.is_available if humanizer.llm else False,
         'database': 'connected'
     })
 

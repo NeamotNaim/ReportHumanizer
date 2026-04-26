@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function ResultsDisplay({ results }) {
   const [copied, setCopied] = useState(false)
@@ -14,13 +14,20 @@ export default function ResultsDisplay({ results }) {
     const element = document.createElement('a')
     const file = new Blob([results.humanized], { type: 'text/plain' })
     element.href = URL.createObjectURL(file)
-    element.download = 'humanized_text.txt'
+    element.download = 'revised_draft.txt'
     document.body.appendChild(element)
     element.click()
     document.body.removeChild(element)
   }
 
   const scoreDrop = results.ai_score_before - results.ai_score_after
+  const beforeIssues = results.analysis_before?.issues || []
+  const afterIssues = results.analysis_after?.issues || []
+  const iterations = results.iterations || 0
+  const stageLog = results.stage_log || []
+  const provider = results.provider || 'unknown'
+  const wordCountOriginal = results.word_count_original || 0
+  const wordCountHumanized = results.word_count_humanized || 0
 
   return (
     <div className="mt-10 glass rounded-2xl p-8 transition-smooth" id="results-section" style={{ animation: 'float 2s ease-out' }}>
@@ -32,28 +39,82 @@ export default function ResultsDisplay({ results }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-white">Results</h2>
+          <h2 className="text-2xl font-bold text-white">Revision Results</h2>
         </div>
-        {scoreDrop > 0 && (
-          <span className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-            📉 {scoreDrop}% AI score reduction
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {iterations > 0 && (
+            <span className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
+              {iterations} refinement pass{iterations > 1 ? 'es' : ''}
+            </span>
+          )}
+          {scoreDrop > 0 && (
+            <span className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              {scoreDrop}% lower heuristic score
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* AI Score Comparison */}
+      {/* Pipeline Summary */}
+      {stageLog.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/30">
+          <button
+            onClick={(e) => {
+              const el = e.currentTarget.nextElementSibling
+              el.style.display = el.style.display === 'none' ? 'block' : 'none'
+            }}
+            className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors w-full"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            Pipeline Log ({stageLog.length} steps) — Powered by {provider}
+          </button>
+          <div style={{ display: 'none' }} className="mt-3 space-y-1">
+            {stageLog.map((log, i) => (
+              <p key={i} className={`text-xs font-mono ${log.startsWith('  ') ? 'text-slate-500 pl-3' : 'text-slate-300'}`}>
+                {log}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Row */}
+      <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/30 text-center">
+          <p className="text-2xl font-bold text-red-400">{results.ai_score_before}</p>
+          <p className="text-xs text-slate-500 mt-1">Score Before</p>
+        </div>
+        <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/30 text-center">
+          <p className="text-2xl font-bold text-emerald-400">{results.ai_score_after}</p>
+          <p className="text-xs text-slate-500 mt-1">Score After</p>
+        </div>
+        <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/30 text-center">
+          <p className="text-2xl font-bold text-slate-200">{wordCountOriginal}</p>
+          <p className="text-xs text-slate-500 mt-1">Words Original</p>
+        </div>
+        <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/30 text-center">
+          <p className={`text-2xl font-bold ${Math.abs(wordCountHumanized - wordCountOriginal) / Math.max(wordCountOriginal, 1) > 0.15 ? 'text-amber-400' : 'text-slate-200'}`}>
+            {wordCountHumanized}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Words Revised</p>
+        </div>
+      </div>
+
+      {/* Heuristic comparison bars */}
       <div className="mb-8 p-6 rounded-xl bg-slate-800/80 border border-slate-700/50 shadow-lg">
         <h3 className="font-semibold text-sm text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-          Detection Analysis
+          Local Writing Heuristics
         </h3>
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Before */}
           <div className="bg-slate-900/50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-sm text-slate-400">Original Score</span>
-              <span className="text-xl font-bold text-red-400">{results.ai_score_before}% AI</span>
+              <span className="text-sm text-slate-400">Before Revision</span>
+              <span className="text-xl font-bold text-red-400">{results.ai_score_before}</span>
             </div>
             <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden shadow-inner">
               <div
@@ -69,8 +130,8 @@ export default function ResultsDisplay({ results }) {
           {/* After */}
           <div className="bg-slate-900/50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-sm text-slate-400">Humanized Score</span>
-              <span className="text-xl font-bold text-emerald-400">{results.ai_score_after}% AI</span>
+              <span className="text-sm text-slate-400">After Revision</span>
+              <span className="text-xl font-bold text-emerald-400">{results.ai_score_after}</span>
             </div>
             <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden shadow-inner">
               <div
@@ -81,6 +142,34 @@ export default function ResultsDisplay({ results }) {
                 }}
               />
             </div>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm text-slate-400 leading-relaxed">
+          {results.assessment_note}
+        </p>
+      </div>
+
+      <div className="mb-8 grid md:grid-cols-2 gap-6">
+        <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-700/50">
+          <h3 className="text-sm uppercase tracking-wider text-slate-400 mb-3">Issues Found Before</h3>
+          <div className="space-y-2">
+            {beforeIssues.length ? beforeIssues.map((issue) => (
+              <p key={issue} className="text-slate-200 leading-relaxed">{issue}</p>
+            )) : (
+              <p className="text-slate-300">No major structural issues were flagged by the local analyzer.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-700/50">
+          <h3 className="text-sm uppercase tracking-wider text-slate-400 mb-3">Issues Still Present After</h3>
+          <div className="space-y-2">
+            {afterIssues.length ? afterIssues.map((issue) => (
+              <p key={issue} className="text-slate-200 leading-relaxed">{issue}</p>
+            )) : (
+              <p className="text-emerald-300">The revised draft no longer triggered the current structural warnings.</p>
+            )}
           </div>
         </div>
       </div>
@@ -145,7 +234,7 @@ export default function ResultsDisplay({ results }) {
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              Copy Text
+              Copy Revision
             </>
           )}
         </button>
@@ -158,7 +247,7 @@ export default function ResultsDisplay({ results }) {
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Export as TXT
+          Export TXT
         </button>
       </div>
     </div>

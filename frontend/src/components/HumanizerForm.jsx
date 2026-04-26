@@ -1,72 +1,21 @@
 import { useState, useEffect } from 'react'
 
-export default function HumanizerForm({ onHumanize, loading }) {
+export default function HumanizerForm({ onHumanize, loading, stageLog }) {
   const [text, setText] = useState('')
   const [tone, setTone] = useState('casual')
   const [language, setLanguage] = useState('en')
   
-  const loadingStates = [
-    'Analyzing text structure...',
-    'Removing AI fingerprints...',
-    'Paraphrasing sentences...',
-    'Applying natural nuances...',
-    'Refining grammar and tone...'
-  ]
-  const [loadingStep, setLoadingStep] = useState(0)
-
-  useEffect(() => {
-    let interval;
-    if (loading) {
-      interval = setInterval(() => {
-        setLoadingStep((prev) => (prev + 1 < loadingStates.length ? prev + 1 : prev))
-      }, 3000)
-    } else {
-      setLoadingStep(0)
-    }
-    return () => clearInterval(interval)
-  }, [loading])
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!text.trim()) {
-      alert('Please enter some text')
-      return
-    }
-    onHumanize(text, tone, language)
-  }
-
-  const handleFileUpload = async (e) => {
-    const uploadedFile = e.target.files[0]
-    if (!uploadedFile) return
-
-    const formData = new FormData()
-    formData.append('file', uploadedFile)
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await response.json()
-      if (data.text) {
-        setText(data.text)
-      }
-    } catch (error) {
-      alert('Error uploading file: ' + error.message)
-    }
-  }
-
   const charPercent = Math.min((text.length / 10000) * 100, 100)
 
   return (
-    <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 glow" id="humanizer-form">
+    <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) onHumanize(text, tone, language) }} className="glass rounded-2xl p-8 glow" id="humanizer-form">
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-white">Humanize Your Text</h2>
+        <h2 className="text-2xl font-bold text-white">Revise Your Draft</h2>
       </div>
 
       {/* Tone & Language Row */}
@@ -108,7 +57,7 @@ export default function HumanizerForm({ onHumanize, loading }) {
       {/* Text Input */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
-          <label className="text-sm font-medium text-slate-300">Paste your AI text</label>
+          <label className="text-sm font-medium text-slate-300">Paste the draft you want to improve</label>
           <span className={`text-xs font-mono ${charPercent > 90 ? 'text-red-400' : 'text-slate-500'}`}>
             {text.length.toLocaleString()} / 10,000
           </span>
@@ -116,7 +65,7 @@ export default function HumanizerForm({ onHumanize, loading }) {
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 10000))}
-          placeholder="Paste your AI-generated text here and watch it transform into natural, human-like writing..."
+          placeholder="Paste a draft here to improve clarity, rhythm, and tone while keeping the original meaning intact..."
           maxLength="10000"
           rows="8"
           id="text-input"
@@ -150,11 +99,43 @@ export default function HumanizerForm({ onHumanize, loading }) {
           <input
             type="file"
             accept=".pdf,.docx,.txt"
-            onChange={handleFileUpload}
+            onChange={async (e) => {
+              const file = e.target.files[0]
+              if (!file) return
+              const formData = new FormData()
+              formData.append('file', file)
+              try {
+                const response = await fetch('/api/upload', { method: 'POST', body: formData })
+                const data = await response.json()
+                if (data.text) setText(data.text)
+              } catch (error) {
+                alert('Error uploading file: ' + error.message)
+              }
+            }}
             className="hidden"
           />
         </label>
       </div>
+
+      {/* Pipeline Progress (visible when loading) */}
+      {loading && stageLog && stageLog.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl bg-slate-800/60 border border-indigo-500/20">
+          <h4 className="text-sm font-medium text-indigo-300 mb-3 flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Pipeline Progress
+          </h4>
+          <div className="space-y-1">
+            {stageLog.map((log, i) => (
+              <p key={i} className={`text-xs font-mono ${log.startsWith('  ') ? 'text-slate-500 pl-3' : 'text-slate-300'}`}>
+                {log}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Submit Button */}
       <button
@@ -175,14 +156,14 @@ export default function HumanizerForm({ onHumanize, loading }) {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              {loadingStates[loadingStep]}
+              Humanizing with AI Pipeline…
             </>
           ) : (
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Humanize Text
+              Revise Draft
             </>
           )}
         </span>
